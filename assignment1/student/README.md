@@ -7,7 +7,14 @@ After you have installed conda, close any open terminals you might have. Then op
 ## 1. Create an environment with dependencies specified in env.yml:
     conda env create -f env.yml
 
-## 2. Activate the new environment:
+## 2. Initialize conda (if you haven't already):
+    conda init zsh
+    
+Then close and reopen your terminal, or run:
+    
+    source ~/.zshrc
+
+## 3. Activate the new environment:
     conda activate cs224n
     
 ## 3. Inside the new environment, install IPython kernel so we can use this environment in jupyter notebook: 
