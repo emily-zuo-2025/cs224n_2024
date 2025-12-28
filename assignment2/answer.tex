@@ -1,0 +1,245 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[margin=1in]{geometry}
+
+\begin{document}
+
+\section*{Proof that Naive-Softmax Loss equals Cross-Entropy Loss}
+
+\textbf{Given:}
+\begin{itemize}
+    \item $\mathbf{y}$: true distribution (one-hot vector)
+    \item $\hat{\mathbf{y}}$: predicted distribution (softmax output)
+    \item $\hat{y}_o$: the predicted probability for the true class $o$
+\end{itemize}
+
+\textbf{Naive-softmax loss (Equation 2)} is typically defined as:
+\begin{equation*}
+J_{\text{naive-softmax}}(\mathbf{v}_c, o, \mathbf{U}) = -\log P(O=o|C=c) = -\log(\hat{y}_o) = -\log\left(\frac{\exp(\mathbf{u}_o^\top \mathbf{v}_c)}{\sum_{w=1}^W \exp(\mathbf{u}_w^\top \mathbf{v}_c)}\right)
+\end{equation*}
+
+\textbf{Cross-entropy loss} between $\mathbf{y}$ and $\hat{\mathbf{y}}$ is defined as:
+\begin{equation*}
+CE(\mathbf{y}, \hat{\mathbf{y}}) = -\sum_{w=1}^W y_w \log(\hat{y}_w)
+\end{equation*}
+
+\textbf{Proof:}
+
+Since $\mathbf{y}$ is a one-hot vector where the true class is at position $o$:
+\begin{itemize}
+    \item $y_o = 1$ (for the true class)
+    \item $y_w = 0$ for all $w \neq o$
+\end{itemize}
+
+Substituting into the cross-entropy formula:
+\begin{equation*}
+CE(\mathbf{y}, \hat{\mathbf{y}}) = -\sum_{w=1}^W y_w \log(\hat{y}_w) = -y_o \log(\hat{y}_o) - \sum_{w \neq o} y_w \log(\hat{y}_w)
+\end{equation*}
+
+Since $y_w = 0$ for all $w \neq o$:
+\begin{equation*}
+CE(\mathbf{y}, \hat{\mathbf{y}}) = -1 \cdot \log(\hat{y}_o) - 0 = -\log(\hat{y}_o)
+\end{equation*}
+
+Therefore:
+\begin{equation*}
+J_{\text{naive-softmax}} = -\log(\hat{y}_o) = CE(\mathbf{y}, \hat{\mathbf{y}})
+\end{equation*}
+
+This completes the proof showing that the naive-softmax loss is equivalent to the cross-entropy loss when the true distribution is a one-hot vector.
+
+\section*{(b) Gradient Analysis of Naive-Softmax Loss}
+
+\subsection*{(b)(i) Partial Derivative with respect to $\mathbf{v}_c$}
+
+\textbf{Answer:}
+\begin{equation*}
+\frac{\partial J_{\text{naive-softmax}}(\mathbf{v}_c, o, \mathbf{U})}{\partial \mathbf{v}_c} = \mathbf{U}^\top(\hat{\mathbf{y}} - \mathbf{y})
+\end{equation*}
+
+\textbf{Derivation:}
+
+The naive softmax loss is:
+\begin{equation*}
+J_{\text{naive-softmax}}(\mathbf{v}_c, o, \mathbf{U}) = -\log P(O=o|C=c) = -\log\left(\frac{\exp(\mathbf{u}_o^\top \mathbf{v}_c)}{\sum_{w \in \text{Vocab}} \exp(\mathbf{u}_w^\top \mathbf{v}_c)}\right)
+\end{equation*}
+
+This simplifies to:
+\begin{equation*}
+J = -\mathbf{u}_o^\top \mathbf{v}_c + \log\left(\sum_{w} \exp(\mathbf{u}_w^\top \mathbf{v}_c)\right)
+\end{equation*}
+
+Taking the partial derivative with respect to $\mathbf{v}_c$:
+\begin{align*}
+\frac{\partial J}{\partial \mathbf{v}_c} &= -\mathbf{u}_o + \frac{\sum_w \exp(\mathbf{u}_w^\top \mathbf{v}_c) \cdot \mathbf{u}_w}{\sum_w \exp(\mathbf{u}_w^\top \mathbf{v}_c)} \\
+&= -\mathbf{u}_o + \sum_w \frac{\exp(\mathbf{u}_w^\top \mathbf{v}_c)}{\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)} \cdot \mathbf{u}_w \\
+&= -\mathbf{u}_o + \sum_w \hat{y}_w \cdot \mathbf{u}_w
+\end{align*}
+
+In vectorized form, since $\mathbf{u}_o = \mathbf{U}^\top \mathbf{y}$ (where $\mathbf{y}$ is the one-hot vector):
+\begin{equation*}
+\frac{\partial J}{\partial \mathbf{v}_c} = \mathbf{U}^\top\hat{\mathbf{y}} - \mathbf{U}^\top \mathbf{y} = \mathbf{U}^\top(\hat{\mathbf{y}} - \mathbf{y})
+\end{equation*}
+
+\subsection*{(b)(ii) When is the Gradient Zero?}
+
+\textbf{Answer:}
+
+The gradient equals zero when:
+\begin{equation*}
+\hat{\mathbf{y}} = \mathbf{y}
+\end{equation*}
+
+This occurs when the predicted probability distribution equals the true distribution, i.e., when the model predicts the correct outside word with probability 1 and all other words with probability 0.
+
+\subsection*{(b)(iii) Interpretation of the Gradient Terms}
+
+The gradient $\mathbf{U}^\top(\hat{\mathbf{y}} - \mathbf{y})$ consists of two terms:
+
+\begin{enumerate}
+\item \textbf{$\mathbf{U}^\top\hat{\mathbf{y}}$ (positive term):} This is a weighted sum of all outside word vectors, weighted by their predicted probabilities. When subtracted from $\mathbf{v}_c$ during gradient descent, it \textbf{pushes the center word vector away} from the average position of all words that the model incorrectly believes are likely to be context words. This reduces false positive predictions.
+
+\item \textbf{$-\mathbf{U}^\top \mathbf{y} = -\mathbf{u}_o$ (negative term):} This is the negative of the true outside/context word vector $\mathbf{u}_o$. When subtracted from $\mathbf{v}_c$ during gradient descent, the negative sign causes this term to \textbf{pull the center word vector toward} the actual context word $\mathbf{u}_o$, making them more similar. This increases the dot product $\mathbf{u}_o^\top \mathbf{v}_c$ and thus the probability of correctly predicting the true context word.
+\end{enumerate}
+
+Together, these updates improve $\mathbf{v}_c$ by making it more similar to actual context words and less similar to words that shouldn't be context words.
+
+\section*{(c) L2 Normalization in Word Embeddings}
+
+\subsection*{Question:}
+In a binary sentiment classification task (positive/negative) where we sum word embeddings to classify phrases, when would L2 normalization (using $\mathbf{u}/||\mathbf{u}||_2$ instead of raw $\mathbf{u}$) take away useful information? When would it not?
+
+\subsection*{Answer:}
+
+\textbf{Key Mathematical Insight from the Hint:}
+
+Consider the case where $\mathbf{u}_x = \alpha \mathbf{u}_y$ for some scalar $\alpha$ and words $x \neq y$.
+
+When $\alpha > 0$ (same direction):
+\begin{equation*}
+\frac{\mathbf{u}_x}{||\mathbf{u}_x||_2} = \frac{\alpha \mathbf{u}_y}{||\alpha \mathbf{u}_y||_2} = \frac{\alpha \mathbf{u}_y}{|\alpha| \cdot ||\mathbf{u}_y||_2} = \frac{\alpha \mathbf{u}_y}{\alpha \cdot ||\mathbf{u}_y||_2} = \frac{\mathbf{u}_y}{||\mathbf{u}_y||_2}
+\end{equation*}
+
+Thus, when $\alpha > 0$, the normalized vectors are \textbf{identical}, collapsing words with different magnitudes but same direction into the same representation.
+
+\textbf{When L2 normalization TAKES AWAY useful information:}
+
+Normalization is detrimental when \textbf{magnitude encodes meaningful semantic differences}:
+
+\begin{enumerate}
+\item \textbf{Sentiment intensity encoded in magnitude:} Consider words with the same sentiment direction but different intensities:
+\begin{itemize}
+\item ``excellent'' $\rightarrow$ $\mathbf{u}_{\text{excellent}}$ (large positive magnitude)
+\item ``good'' $\rightarrow$ $\mathbf{u}_{\text{good}} = 0.3 \cdot \mathbf{u}_{\text{excellent}}$ (same direction, smaller magnitude)
+\end{itemize}
+
+For the phrase ``This is excellent'', the raw sum would give a strong positive score. For ``This is good'', the raw sum gives a weaker positive score, appropriately reflecting the intensity difference.
+
+After normalization, both contribute identically to the sum, so ``This is excellent'' and ``This is good'' would receive the same classification score, losing the nuanced intensity information.
+
+\item \textbf{Word importance/weight:} If sentiment-bearing words (``excellent'', ``terrible'') have larger magnitudes than neutral words (``is'', ``the''), the raw embeddings naturally weight sentiment words more heavily in the sum. Normalization makes all words contribute equally, potentially diluting the sentiment signal with neutral words.
+
+\item \textbf{Multiple occurrences matter differently:} In raw form, ``good good good'' would sum to a stronger positive signal than ``good''. With normalization, multiple identical words contribute the exact same amount as a single occurrence, losing frequency information that might indicate emphasis.
+\end{enumerate}
+
+\textbf{When L2 normalization DOES NOT take away useful information:}
+
+Normalization is benign or beneficial when \textbf{only direction matters}:
+
+\begin{enumerate}
+\item \textbf{Magnitude is arbitrary or noise:} If magnitude differences arise from training artifacts (e.g., word frequency in corpus) rather than semantic meaning, normalization removes noise and focuses on the meaningful directional information. Different words with the same sentiment should contribute similarly.
+
+\item \textbf{Opposite sentiments preserved:} When $\alpha < 0$, normalization preserves the opposition:
+\begin{equation*}
+\frac{\mathbf{u}_x}{||\mathbf{u}_x||_2} = \frac{\alpha \mathbf{u}_y}{|\alpha| \cdot ||\mathbf{u}_y||_2} = \frac{\alpha}{|\alpha|} \cdot \frac{\mathbf{u}_y}{||\mathbf{u}_y||_2} = -\frac{\mathbf{u}_y}{||\mathbf{u}_y||_2}
+\end{equation*}
+
+This means ``good'' and ``bad'' (if $\mathbf{u}_{\text{bad}} = -\alpha \mathbf{u}_{\text{good}}$ with $\alpha > 0$) will still point in opposite directions after normalization, preserving the essential positive vs. negative distinction needed for binary classification.
+
+\item \textbf{Balanced phrase representation:} When we want each word to contribute equally (e.g., to prevent longer phrases from having artificially larger scores just due to more words), normalization ensures fair contribution from each word based purely on sentiment direction, not arbitrary magnitude.
+
+\item \textbf{Words are linearly independent:} If different words have embeddings that are not scalar multiples of each other (i.e., $\mathbf{u}_x \neq \alpha \mathbf{u}_y$ for any $\alpha$), normalization doesn't cause the collision problem described above. The directional differences are preserved.
+\end{enumerate}
+
+\textbf{Summary:} L2 normalization removes useful information when magnitude encodes meaningful properties like sentiment intensity or word importance. It preserves essential information when only directional relationships matter for classification, particularly the positive vs. negative distinction ($\alpha < 0$ case)
+
+\section*{(d) Partial Derivative with respect to U}
+
+\subsection*{Question:}
+Write down the partial derivative of $J_{\text{naive-softmax}}(\mathbf{v}_c, o, \mathbf{U})$ with respect to $\mathbf{U}$, broken down in terms of the column vectors $\frac{\partial J}{\partial \mathbf{u}_1}, \frac{\partial J}{\partial \mathbf{u}_2}, \ldots, \frac{\partial J}{\partial \mathbf{u}_{|\text{Vocab}|}}$ (do not further expand these terms).
+
+\subsection*{Answer:}
+
+The partial derivative of $J$ with respect to the matrix $\mathbf{U}$ is:
+
+\begin{equation*}
+\frac{\partial J_{\text{naive-softmax}}(\mathbf{v}_c, o, \mathbf{U})}{\partial \mathbf{U}} = \left[\frac{\partial J}{\partial \mathbf{u}_1} \;\; \frac{\partial J}{\partial \mathbf{u}_2} \;\; \cdots \;\; \frac{\partial J}{\partial \mathbf{u}_{|\text{Vocab}|}}\right]
+\end{equation*}
+
+This is a matrix of the same shape as $\mathbf{U}$, where each column is the partial derivative with respect to the corresponding column vector of $\mathbf{U}$.
+
+\section*{(e) Partial Derivatives with respect to Individual Outside Word Vectors}
+
+\subsection*{Question:}
+Compute the partial derivatives of $J_{\text{naive-softmax}}(\mathbf{v}_c, o, \mathbf{U})$ with respect to each outside word vector $\mathbf{u}_w$. Consider two cases: when $w = o$ (the true outside word) and when $w \neq o$ (all other words).
+
+\subsection*{Answer:}
+
+\textbf{Case 1: When $w = o$ (the true outside word)}
+
+\begin{equation*}
+\frac{\partial J}{\partial \mathbf{u}_o} = (\hat{y}_o - 1) \mathbf{v}_c
+\end{equation*}
+
+\textbf{Case 2: When $w \neq o$ (all other words)}
+
+\begin{equation*}
+\frac{\partial J}{\partial \mathbf{u}_w} = \hat{y}_w \mathbf{v}_c
+\end{equation*}
+
+\textbf{Unified form:} Both cases can be written as:
+\begin{equation*}
+\frac{\partial J}{\partial \mathbf{u}_w} = (\hat{y}_w - y_w) \mathbf{v}_c
+\end{equation*}
+
+where $y_w = 1$ if $w = o$ and $y_w = 0$ if $w \neq o$.
+
+\subsection*{Derivation:}
+
+Recall that the naive softmax loss is:
+\begin{equation*}
+J = -\log P(O=o|C=c) = -\log\left(\frac{\exp(\mathbf{u}_o^\top \mathbf{v}_c)}{\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)}\right)
+\end{equation*}
+
+This simplifies to:
+\begin{equation*}
+J = -\mathbf{u}_o^\top \mathbf{v}_c + \log\left(\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)\right)
+\end{equation*}
+
+\textbf{Case 1: $w = o$ (true outside word)}
+
+Taking the derivative with respect to $\mathbf{u}_o$:
+\begin{align*}
+\frac{\partial J}{\partial \mathbf{u}_o} &= \frac{\partial}{\partial \mathbf{u}_o}\left[-\mathbf{u}_o^\top \mathbf{v}_c + \log\left(\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)\right)\right] \\
+&= -\mathbf{v}_c + \frac{1}{\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)} \cdot \exp(\mathbf{u}_o^\top \mathbf{v}_c) \cdot \mathbf{v}_c \\
+&= -\mathbf{v}_c + \frac{\exp(\mathbf{u}_o^\top \mathbf{v}_c)}{\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)} \cdot \mathbf{v}_c \\
+&= -\mathbf{v}_c + \hat{y}_o \mathbf{v}_c \\
+&= (\hat{y}_o - 1) \mathbf{v}_c
+\end{align*}
+
+Note that $y_o = 1$ (since $o$ is the true word), so this can also be written as $(\hat{y}_o - y_o) \mathbf{v}_c$.
+
+\textbf{Case 2: $w \neq o$ (other words)}
+
+For any word $w \neq o$, the first term $-\mathbf{u}_o^\top \mathbf{v}_c$ does not depend on $\mathbf{u}_w$, so its derivative is zero:
+\begin{align*}
+\frac{\partial J}{\partial \mathbf{u}_w} &= \frac{\partial}{\partial \mathbf{u}_w}\left[-\mathbf{u}_o^\top \mathbf{v}_c + \log\left(\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)\right)\right] \\
+&= 0 + \frac{1}{\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)} \cdot \exp(\mathbf{u}_w^\top \mathbf{v}_c) \cdot \mathbf{v}_c \\
+&= \frac{\exp(\mathbf{u}_w^\top \mathbf{v}_c)}{\sum_{w'} \exp(\mathbf{u}_{w'}^\top \mathbf{v}_c)} \cdot \mathbf{v}_c \\
+&= \hat{y}_w \mathbf{v}_c
+\end{align*}
+
+Note that $y_w = 0$ (since $w$ is not the true word), so this can also be written as $(\hat{y}_w - y_w) \mathbf{v}_c = (\hat{y}_w - 0) \mathbf{v}_c = \hat{y}_w \mathbf{v}_c$.
+
+\end{document}
