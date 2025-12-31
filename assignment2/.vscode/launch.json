@@ -5,12 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Python File",
+            "name": "Python Debugger: Run Assignment (Debug Mode)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
-            "args": ["part_d"]
-
+            "program": "${workspaceFolder}/student-1/run.py",
+            "args": ["-d"],
+            "cwd": "${workspaceFolder}/student-1",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python Debugger: Run Assignment (Full Training)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/student-1/run.py",
+            "cwd": "${workspaceFolder}/student-1",
+            "console": "integratedTerminal"
         }
     ]
 }

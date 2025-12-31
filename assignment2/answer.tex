@@ -328,4 +328,132 @@ For example, if $p_{\text{drop}} = 0.5$ (dropping half the units), then $\gamma 
 
 \textbf{During evaluation}, dropout should NOT be applied because we want deterministic, optimal predictions using all available learned features. Applying dropout at test time would introduce unnecessary randomness and reduce model performance by discarding useful information. Instead, we use all neurons with their learned weights, and the scaling factor $\gamma = \frac{1}{1-p_{\text{drop}}}$ applied during training ensures that the expected activations during training match the actual activations at test time (when all units are active). This principle is sometimes called "inverted dropout" and ensures smooth transition from training to evaluation without requiring weight scaling at test time.
 
+\section*{3. Dependency Parsing}
+
+\subsection*{(e) Neural Dependency Parsing}
+
+\subsubsection*{(e)(i) Derivative of ReLU Layer with respect to Input (20 points)}
+
+\textbf{Question:} Compute the derivative of $\mathbf{h} = \text{ReLU}(\mathbf{x}\mathbf{W} + \mathbf{b}_1)$ with respect to $\mathbf{x}$. For simplicity, show the derivative $\frac{\partial h_i}{\partial x_j}$ for some index $i$ and $j$. Ignore the case where the derivative is not defined at 0.
+
+\textbf{Answer:}
+
+\begin{equation*}
+\frac{\partial h_i}{\partial x_j} = \mathbf{1}\{z_i > 0\} \cdot W_{ji}
+\end{equation*}
+
+where $z_i = (\mathbf{x}\mathbf{W} + \mathbf{b}_1)_i$ is the $i$-th element of the pre-activation, and $\mathbf{1}\{z_i > 0\}$ is an indicator function that equals 1 if $z_i > 0$ and 0 otherwise.
+
+\textbf{Derivation:}
+
+Let $\mathbf{z} = \mathbf{x}\mathbf{W} + \mathbf{b}_1$, so $\mathbf{h} = \text{ReLU}(\mathbf{z})$.
+
+By the chain rule:
+\begin{equation*}
+\frac{\partial h_i}{\partial x_j} = \frac{\partial h_i}{\partial z_i} \cdot \frac{\partial z_i}{\partial x_j}
+\end{equation*}
+
+\textbf{Step 1:} Compute $\frac{\partial h_i}{\partial z_i}$.
+
+Since $h_i = \text{ReLU}(z_i) = \max(z_i, 0)$:
+\begin{equation*}
+\frac{\partial h_i}{\partial z_i} = \begin{cases}
+1 & \text{if } z_i > 0 \\
+0 & \text{if } z_i < 0
+\end{cases} = \mathbf{1}\{z_i > 0\}
+\end{equation*}
+
+\textbf{Step 2:} Compute $\frac{\partial z_i}{\partial x_j}$.
+
+We have $z_i = \sum_{k} x_k W_{ki} + b_{1i}$ (the $i$-th element of $\mathbf{x}\mathbf{W} + \mathbf{b}_1$).
+
+Taking the derivative with respect to $x_j$:
+\begin{equation*}
+\frac{\partial z_i}{\partial x_j} = W_{ji}
+\end{equation*}
+
+\textbf{Step 3:} Combine using the chain rule.
+
+\begin{equation*}
+\frac{\partial h_i}{\partial x_j} = \mathbf{1}\{z_i > 0\} \cdot W_{ji}
+\end{equation*}
+
+This shows that the gradient flow from $h_i$ back to $x_j$ is proportional to the weight $W_{ji}$, but only when the ReLU was active (i.e., $z_i > 0$). When the ReLU unit is inactive ($z_i \leq 0$), no gradient flows back through that path.
+
+\subsubsection*{(e)(ii) Derivative of Cross-Entropy Loss with respect to Logits (20 points)}
+
+\textbf{Question:} Compute the partial derivative of $J(\theta) = \text{CE}(\mathbf{y}, \hat{\mathbf{y}})$ with respect to the $i$-th entry of $\mathbf{l}$, denoted as $l_i$. Specifically, compute $\frac{\partial \text{CE}(\mathbf{y}, \hat{\mathbf{y}})}{\partial l_i}$, assuming that $\mathbf{l} \in \mathbb{R}^3$, $\hat{\mathbf{y}} \in \mathbb{R}^3$, $\mathbf{y} \in \mathbb{R}^3$, and the true label is $c$ (i.e., $y_j = 1$ if $j = c$). 
+
+Hint: Use the chain rule: $\frac{\partial J}{\partial \mathbf{l}} = \frac{\partial J}{\partial \hat{\mathbf{y}}} \cdot \frac{\partial \hat{\mathbf{y}}}{\partial \mathbf{l}}$.
+
+\textbf{Answer:}
+
+\begin{equation*}
+\frac{\partial \text{CE}(\mathbf{y}, \hat{\mathbf{y}})}{\partial l_i} = \hat{y}_i - y_i
+\end{equation*}
+
+where $y_i = 1$ if $i = c$ (the true class) and $y_i = 0$ otherwise.
+
+\textbf{Derivation:}
+
+The cross-entropy loss is:
+\begin{equation*}
+\text{CE}(\mathbf{y}, \hat{\mathbf{y}}) = -\sum_{j=1}^{3} y_j \log \hat{y}_j
+\end{equation*}
+
+We have $\hat{\mathbf{y}} = \text{softmax}(\mathbf{l})$, where:
+\begin{equation*}
+\hat{y}_k = \frac{\exp(l_k)}{\sum_{j=1}^{3} \exp(l_j)}
+\end{equation*}
+
+Using the chain rule:
+\begin{equation*}
+\frac{\partial \text{CE}}{\partial l_i} = \sum_{k=1}^{3} \frac{\partial \text{CE}}{\partial \hat{y}_k} \cdot \frac{\partial \hat{y}_k}{\partial l_i}
+\end{equation*}
+
+\textbf{Step 1:} Compute $\frac{\partial \text{CE}}{\partial \hat{y}_k}$.
+
+\begin{equation*}
+\frac{\partial \text{CE}}{\partial \hat{y}_k} = \frac{\partial}{\partial \hat{y}_k}\left(-\sum_{j=1}^{3} y_j \log \hat{y}_j\right) = -\frac{y_k}{\hat{y}_k}
+\end{equation*}
+
+\textbf{Step 2:} Compute $\frac{\partial \hat{y}_k}{\partial l_i}$.
+
+For the softmax function, we need to consider two cases:
+
+\textbf{Case 2a:} When $k = i$:
+\begin{align*}
+\frac{\partial \hat{y}_i}{\partial l_i} &= \frac{\partial}{\partial l_i}\left(\frac{\exp(l_i)}{\sum_j \exp(l_j)}\right) \\
+&= \frac{\exp(l_i) \cdot \sum_j \exp(l_j) - \exp(l_i) \cdot \exp(l_i)}{(\sum_j \exp(l_j))^2} \\
+&= \frac{\exp(l_i)}{\sum_j \exp(l_j)} \cdot \frac{\sum_j \exp(l_j) - \exp(l_i)}{\sum_j \exp(l_j)} \\
+&= \hat{y}_i(1 - \hat{y}_i)
+\end{align*}
+
+\textbf{Case 2b:} When $k \neq i$:
+\begin{align*}
+\frac{\partial \hat{y}_k}{\partial l_i} &= \frac{\partial}{\partial l_i}\left(\frac{\exp(l_k)}{\sum_j \exp(l_j)}\right) \\
+&= \frac{0 \cdot \sum_j \exp(l_j) - \exp(l_k) \cdot \exp(l_i)}{(\sum_j \exp(l_j))^2} \\
+&= -\frac{\exp(l_k)}{\sum_j \exp(l_j)} \cdot \frac{\exp(l_i)}{\sum_j \exp(l_j)} \\
+&= -\hat{y}_k \hat{y}_i
+\end{align*}
+
+\textbf{Step 3:} Combine using the chain rule.
+
+\begin{align*}
+\frac{\partial \text{CE}}{\partial l_i} &= \sum_{k=1}^{3} \frac{\partial \text{CE}}{\partial \hat{y}_k} \cdot \frac{\partial \hat{y}_k}{\partial l_i} \\
+&= \frac{\partial \text{CE}}{\partial \hat{y}_i} \cdot \frac{\partial \hat{y}_i}{\partial l_i} + \sum_{k \neq i} \frac{\partial \text{CE}}{\partial \hat{y}_k} \cdot \frac{\partial \hat{y}_k}{\partial l_i} \\
+&= \left(-\frac{y_i}{\hat{y}_i}\right) \cdot \hat{y}_i(1 - \hat{y}_i) + \sum_{k \neq i} \left(-\frac{y_k}{\hat{y}_k}\right) \cdot (-\hat{y}_k \hat{y}_i) \\
+&= -y_i(1 - \hat{y}_i) + \sum_{k \neq i} y_k \hat{y}_i \\
+&= -y_i + y_i \hat{y}_i + \hat{y}_i \sum_{k \neq i} y_k \\
+&= -y_i + \hat{y}_i\left(y_i + \sum_{k \neq i} y_k\right) \\
+&= -y_i + \hat{y}_i \sum_{k=1}^{3} y_k
+\end{align*}
+
+Since $\mathbf{y}$ is a one-hot vector (i.e., $\sum_{k=1}^{3} y_k = 1$):
+\begin{equation*}
+\frac{\partial \text{CE}}{\partial l_i} = -y_i + \hat{y}_i \cdot 1 = \hat{y}_i - y_i
+\end{equation*}
+
+This elegant result shows that the gradient of cross-entropy loss with respect to the logits is simply the difference between the predicted probabilities and the true labels. When $i = c$ (the true class), the gradient is $\hat{y}_c - 1$, which is negative and pushes the logit $l_c$ higher. When $i \neq c$, the gradient is $\hat{y}_i - 0 = \hat{y}_i$, which is positive and pushes the logit $l_i$ lower.
+
 \end{document}

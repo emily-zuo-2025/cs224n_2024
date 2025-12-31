@@ -157,7 +157,21 @@ class ParserModel(nn.Module):
         ### Please see the following docs for support:
         ###     Matrix product: https://pytorch.org/docs/stable/torch.html#torch.matmul
         ###     ReLU: https://pytorch.org/docs/stable/nn.html?highlight=relu#torch.nn.functional.relu
-        logits = None
+        
+        # Step 1: Get embeddings
+        x = self.embedding_lookup(w)  # (batch_size, n_features * embed_size)
+        
+        # Step 2: Apply first linear transformation (embedding to hidden)
+        h = torch.matmul(x, self.embed_to_hidden_weight) + self.embed_to_hidden_bias  # (batch_size, hidden_size)
+        
+        # Step 3: Apply ReLU activation
+        h = F.relu(h)  # (batch_size, hidden_size)
+        
+        # Step 4: Apply dropout
+        h = self.dropout(h)  # (batch_size, hidden_size)
+        
+        # Step 5: Apply second linear transformation (hidden to logits)
+        logits = torch.matmul(h, self.hidden_to_logits_weight) + self.hidden_to_logits_bias  # (batch_size, n_classes)
 
         ### END YOUR CODE
         return logits
