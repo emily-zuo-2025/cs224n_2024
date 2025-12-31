@@ -242,4 +242,90 @@ For any word $w \neq o$, the first term $-\mathbf{u}_o^\top \mathbf{v}_c$ does n
 
 Note that $y_w = 0$ (since $w$ is not the true word), so this can also be written as $(\hat{y}_w - y_w) \mathbf{v}_c = (\hat{y}_w - 0) \mathbf{v}_c = \hat{y}_w \mathbf{v}_c$.
 
+\section*{2. Machine Learning \& Neural Networks}
+
+\subsection*{(a) Adam Optimizer}
+
+\subsubsection*{(a)(i) Momentum - Reducing Update Variance (2 points)}
+
+\textbf{Question:} Briefly explain how using $\mathbf{m}$ stops the updates from varying as much and why this low variance may be helpful to learning.
+
+\textbf{Answer:}
+
+Momentum reduces update variance by accumulating a weighted average of past gradients rather than using only the current minibatch gradient. Since $\mathbf{m}_{t+1} = \beta_1 \mathbf{m}_t + (1-\beta_1) \nabla_{\theta_t} J_{\text{minibatch}}(\theta_t)$ with $\beta_1 \approx 0.9$, the momentum vector $\mathbf{m}$ smooths out noisy gradient estimates by incorporating historical gradient information. This dampening effect means that random fluctuations in individual minibatch gradients tend to cancel out, while consistent gradient directions accumulate and reinforce over time.
+
+Lower variance updates are helpful because they provide a more stable and reliable estimate of the true gradient direction. This stability allows the optimizer to use larger learning rates without overshooting, helps the model navigate flat regions or narrow valleys in the loss landscape more efficiently, and reduces oscillations that can slow down or destabilize training. Additionally, momentum helps the optimizer build velocity in consistent directions, allowing it to accelerate through plateaus and escape shallow local minima more effectively.
+
+\subsubsection*{(a)(ii) Adaptive Learning Rates - Dividing by $\sqrt{\mathbf{v}}$ (2 points)}
+
+\textbf{Question:} Since Adam divides the update by $\sqrt{\mathbf{v}}$, which of the model parameters will get larger updates? Why might this help with learning?
+
+\textbf{Answer:}
+
+Parameters with \textbf{smaller gradient magnitudes} will receive larger updates. Since $\mathbf{v}_{t+1}$ tracks the exponentially weighted average of squared gradients ($\mathbf{v}_{t+1} = \beta_2 \mathbf{v}_t + (1-\beta_2)(\nabla_{\theta_t} J \odot \nabla_{\theta_t} J)$), parameters with consistently large gradients will have large $\mathbf{v}$ values. The update rule $\theta_{t+1} = \theta_t - \alpha \mathbf{m}_{t+1}/\sqrt{\mathbf{v}_{t+1}}$ divides by $\sqrt{\mathbf{v}}$, which means parameters with small gradients (small $\mathbf{v}$) get divided by a small number, resulting in larger relative updates, while parameters with large gradients get scaled down.
+
+This adaptive learning rate mechanism is beneficial because it automatically balances the learning rates across different parameters. Parameters that receive consistently large gradients (which might correspond to frequently updated features or high-variance inputs) get their updates dampened to prevent overshooting, while parameters with small gradients (which might correspond to rarely activated features or infrequent patterns) get amplified updates to ensure they still learn effectively. This is particularly helpful in neural networks where different parameters can have vastly different gradient scales—for example, parameters in early layers versus late layers, or parameters associated with rare versus common features. By normalizing the update magnitudes, Adam ensures more uniform and stable learning across all parameters, leading to faster convergence and better generalization.
+
+\subsection*{(b) Dropout Regularization}
+
+Dropout is a regularization technique where, during training, units in the hidden layer $\mathbf{h}$ are randomly set to zero with probability $p_{\text{drop}}$, and then the result is multiplied by a constant $\gamma$:
+
+\begin{equation*}
+\mathbf{h}_{\text{drop}} = \gamma \mathbf{d} \odot \mathbf{h}
+\end{equation*}
+
+where $\mathbf{d} \in \{0,1\}^{D_h}$ is a mask vector (each entry is 0 with probability $p_{\text{drop}}$ and 1 with probability $1-p_{\text{drop}}$), and $\gamma$ is chosen such that:
+
+\begin{equation*}
+\mathbb{E}_{p_{\text{drop}}}[\mathbf{h}_{\text{drop}}]_i = h_i \quad \text{for all } i \in \{1, \ldots, D_h\}
+\end{equation*}
+
+\subsubsection*{(b)(i) Value of $\gamma$ in terms of $p_{\text{drop}}$ (2 points)}
+
+\textbf{Answer:}
+
+\begin{equation*}
+\gamma = \frac{1}{1 - p_{\text{drop}}}
+\end{equation*}
+
+\textbf{Derivation:}
+
+We need to find $\gamma$ such that the expected value of the dropped-out hidden layer equals the original hidden layer. Starting with the definition:
+
+\begin{equation*}
+\mathbb{E}[\mathbf{h}_{\text{drop}}]_i = \mathbb{E}[\gamma d_i h_i] = \gamma \mathbb{E}[d_i] h_i
+\end{equation*}
+
+Since $d_i$ is a Bernoulli random variable that takes value 0 with probability $p_{\text{drop}}$ and 1 with probability $1-p_{\text{drop}}$:
+
+\begin{equation*}
+\mathbb{E}[d_i] = 0 \cdot p_{\text{drop}} + 1 \cdot (1 - p_{\text{drop}}) = 1 - p_{\text{drop}}
+\end{equation*}
+
+Therefore:
+
+\begin{equation*}
+\mathbb{E}[\mathbf{h}_{\text{drop}}]_i = \gamma (1 - p_{\text{drop}}) h_i
+\end{equation*}
+
+For this to equal $h_i$ (as required by the constraint):
+
+\begin{align*}
+\gamma (1 - p_{\text{drop}}) h_i &= h_i \\
+\gamma (1 - p_{\text{drop}}) &= 1 \\
+\gamma &= \frac{1}{1 - p_{\text{drop}}}
+\end{align*}
+
+For example, if $p_{\text{drop}} = 0.5$ (dropping half the units), then $\gamma = \frac{1}{0.5} = 2$, which compensates by doubling the remaining activations so that the expected output magnitude stays constant.
+
+\subsubsection*{(b)(ii) When to Apply Dropout (2 points)}
+
+\textbf{Question:} Why should dropout be applied during training? Why should dropout NOT be applied during evaluation?
+
+\textbf{Answer:}
+
+\textbf{During training}, dropout should be applied because it acts as a powerful regularization technique that prevents overfitting. By randomly dropping units in each minibatch, dropout forces the network to learn robust and redundant representations that don't rely on the presence of specific neurons. This prevents co-adaptation of neurons (where neurons become overly dependent on each other) and encourages each neuron to learn independently useful features. The network essentially learns to work well even when parts of it are missing, which improves generalization to unseen data.
+
+\textbf{During evaluation}, dropout should NOT be applied because we want deterministic, optimal predictions using all available learned features. Applying dropout at test time would introduce unnecessary randomness and reduce model performance by discarding useful information. Instead, we use all neurons with their learned weights, and the scaling factor $\gamma = \frac{1}{1-p_{\text{drop}}}$ applied during training ensures that the expected activations during training match the actual activations at test time (when all units are active). This principle is sometimes called "inverted dropout" and ensures smooth transition from training to evaluation without requiring weight scaling at test time.
+
 \end{document}
