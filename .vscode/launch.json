@@ -1,0 +1,49 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["1d"],
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+            "justMyCode": true,
+            "python": "/opt/anaconda3/envs/cs224n-cpu/bin/python"
+        },
+        {
+            "name": "Python: Sanity Check (1d)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/assignment3/student/sanity_check.py",
+            "args": ["1d"],
+            "cwd": "${workspaceFolder}/assignment3/student",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "python": "/opt/anaconda3/envs/cs224n-cpu/bin/python"
+        },
+        {
+            "name": "Python: Sanity Check (1e)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/assignment3/student/sanity_check.py",
+            "args": ["1e"],
+            "cwd": "${workspaceFolder}/assignment3/student",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "python": "/opt/anaconda3/envs/cs224n-cpu/bin/python"
+        },
+        {
+            "name": "Python: Sanity Check (1f)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/assignment3/student/sanity_check.py",
+            "args": ["1f"],
+            "cwd": "${workspaceFolder}/assignment3/student",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "python": "/opt/anaconda3/envs/cs224n-cpu/bin/python"
+        }
+    ]
+}

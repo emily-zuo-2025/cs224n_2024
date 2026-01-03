@@ -1,0 +1,10 @@
+https://www.runoob.com/pytorch/transformer-model.html
+
+Patrick Loeber PyTorch Tutorial 
+https://www.youtube.com/watch?v=EMXfZB8FVUA
+
+ML Study Plan
+https://github.com/patrickloeber/ml-study-plan
+
+https://www.fast.ai/
+

@@ -1,0 +1,110 @@
+{
+    // ========== Python Environment ==========
+    "python.defaultInterpreterPath": "/opt/anaconda3/envs/cs224n-cpu/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    
+    // ========== Python Code Quality ==========
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.completeFunctionParens": true,
+    
+    // ========== Theme & Display (Eye-friendly for long coding) ==========
+    "workbench.colorTheme": "Quiet Light",
+    "editor.renderWhitespace": "none",
+    "editor.fontFamily": "'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, 'Courier New', monospace",
+    "editor.fontSize": 14,
+    "editor.lineHeight": 22,
+    "editor.fontLigatures": true,
+    "editor.fontWeight": "400",
+    "editor.cursorBlinking": "smooth",
+    "editor.cursorSmoothCaretAnimation": "on",
+    "editor.smoothScrolling": true,
+    
+    // ========== Bracket & Indent Visualization ==========
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": "active",
+    "editor.guides.indentation": true,
+    "workbench.tree.indent": 20,
+    
+    // ========== Editor Behavior ==========
+    "editor.minimap.enabled": false,
+    "editor.rulers": [88, 120],
+    "editor.wordWrap": "off",
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+    
+    // ========== IntelliSense & Suggestions ==========
+    "editor.suggestSelection": "first",
+    "editor.acceptSuggestionOnCommitCharacter": true,
+    "editor.quickSuggestions": {
+        "other": true,
+        "comments": false,
+        "strings": true
+    },
+    "editor.inlineSuggest.enabled": true,
+    
+    // ========== Git Integration ==========
+    "git.autofetch": true,
+    "git.confirmSync": false,
+    "git.enableSmartCommit": true,
+    
+    // ========== Terminal ==========
+    "terminal.integrated.fontSize": 14,
+    "terminal.integrated.fontFamily": "'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace",
+    "terminal.integrated.fontWeight": "400",
+    "terminal.integrated.fontWeightBold": "700",
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.smoothScrolling": true,
+    
+    // ========== File Explorer ==========
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/.pytest_cache": true,
+        "**/.ipynb_checkpoints": true,
+        "**/.DS_Store": true
+    },
+    
+    // ========== Jupyter Notebooks ==========
+    "jupyter.askForKernelRestart": false,
+    "jupyter.enableCellCodeLens": true,
+    "notebook.cellToolbarLocation": {
+        "default": "right",
+        "jupyter-notebook": "left"
+    },
+    "notebook.lineNumbers": "on",
+    "notebook.outline.showCodeCells": true,
+    
+    // ========== AI/ML Specific ==========
+    "python.analysis.memory.keepLibraryAst": true,
+    "python.languageServer": "Pylance",
+    
+    // ========== Performance ==========
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/__pycache__/**": true,
+        "**/.venv/**": true,
+        "**/venv/**": true
+    },
+    
+    // ========== Miscellaneous ==========
+    "workbench.startupEditor": "none",
+    "explorer.confirmDelete": false,
+    "explorer.confirmDragAndDrop": false,
+    "breadcrumbs.enabled": true,
+    "workbench.editor.enablePreview": false
+}
