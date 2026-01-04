@@ -9,5 +9,8 @@ https://github.com/patrickloeber/pytorchTutorial
 Patrick's ML Study Plan
 https://github.com/patrickloeber/ml-study-plan
 
+Patrick's ML from scratch
+https://www.youtube.com/watch?v=rLOyrWV8gmA
+
 https://www.fast.ai/
 
