@@ -12,5 +12,9 @@ https://github.com/patrickloeber/ml-study-plan
 Patrick's ML from scratch
 https://www.youtube.com/watch?v=rLOyrWV8gmA
 
+Patrick's HF transformers, tokenizer, models
+https://www.youtube.com/watch?v=QEaBAZQCtwE&t=512s
+
+
 https://www.fast.ai/
 
