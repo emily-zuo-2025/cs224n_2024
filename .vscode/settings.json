@@ -79,7 +79,6 @@
     
     // ========== Jupyter Notebooks ==========
     "jupyter.askForKernelRestart": false,
-    "jupyter.enableCellCodeLens": true,
     "notebook.cellToolbarLocation": {
         "default": "right",
         "jupyter-notebook": "left"
@@ -106,5 +105,6 @@
     "explorer.confirmDelete": false,
     "explorer.confirmDragAndDrop": false,
     "breadcrumbs.enabled": true,
-    "workbench.editor.enablePreview": false
+    "workbench.editor.enablePreview": false,
+    "jupyter.interactiveWindow.codeLens.enable": true
 }
