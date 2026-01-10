@@ -1,0 +1,31 @@
+# Data files
+data/
+*.tar.gz
+*.zip
+*.pkl
+*.h5
+
+# PyTorch checkpoints
+*.pth
+*.pt
+
+# TensorBoard logs
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
