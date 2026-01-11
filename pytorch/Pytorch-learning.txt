@@ -1,7 +1,7 @@
 https://www.runoob.com/pytorch/transformer-model.html
 
 Patrick Loeber PyTorch Tutorial 
-https://www.youtube.com/watch?v=EMXfZB8FVUA
+https://www.youtube.com/watch?v=EMXfZB8FVUA&list=PLqnslRFeH2UrcDBWF5mfPGpqQDSta6VK4
 
 Patrick's github for PyTorch Tutorial
 https://github.com/patrickloeber/pytorchTutorial
