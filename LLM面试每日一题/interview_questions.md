@@ -6,8 +6,10 @@ import text
 # Day 2 
 Why can Transformers easily handle 'long-range dependencies'? In what ways are they stronger than RNNs and LSTMs?
 
-## Answer:
+## Question:
 ### <mark>What is “long-range dependency”?</mark>
+
+## Answer:
 
 Imagine this sentence: “The kitten was only playing in the park because there were many kind people in the park who fed it, for example, it ate a lot of fish yesterday.”
 
@@ -138,3 +140,100 @@ $$\frac{\partial L}{\partial h_1} = \frac{\partial L}{\partial h_n} \cdot \prod_
 - No matter how long the sequence is, it can directly capture the relationship between words
 
 **Simple Explanation:** Transformer is like equipping each word with a "telescope" - it can see all other words in the sentence at a glance, without needing to transmit information step by step like RNN. Through the direct computation of the self-attention mechanism, Transformer thoroughly solves the long-range dependency problem. This is why it can easily handle long-range dependencies!
+
+
+
+# Day 3
+## Question:
+### <mark>What is the purpose of Multi-Head Attention? Why is one "head" not enough?</mark>
+
+## Answer:
+
+### Core Principle: The Power of Subspaces
+
+**Key Insight:** Single-head attention can only learn one attention pattern, like viewing the world through a single filter. Multi-head attention, through multiple parallel attention heads, allows the model to learn different attention patterns in different representation subspaces.
+
+### Understanding from a Mathematical Perspective
+
+Assume our input dimension is $d_{model} = 512$:
+
+**Problem with Single-Head Attention:**
+
+$$Q, K, V = XW_Q, XW_K, XW_V \quad \text{(all are 512-dimensional)}$$
+
+$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+
+* All attention computations are performed in **the same 512-dimensional space**
+* Can only learn **one attention distribution pattern**
+* Like having only one "attention filter"
+
+**The Clever Approach of Multi-Head Attention:**
+
+Split the 512-dimensional space into 8 subspaces, each 64-dimensional:
+
+$$\text{head}_i = \text{Attention}(XW_i^Q, XW_i^K, XW_i^V)$$
+
+$$\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_8)W^O$$
+
+**Why is this better?** The key is:
+
+#### ① Same Parameter Count, but Stronger Expressive Power
+
+- **Single head:** 3 matrices of $512 \times 512$ = 786K parameters
+- **8 heads:** $8 \times 3 \times (512 \times 64)$ = 786K parameters **(same!)**
+- But **8 heads can learn 8 different attention patterns**
+
+#### ② Independence of Subspaces
+
+- Each head works independently in a **different subspace**
+- Like viewing the same image with **8 filters of different wavelengths**
+- One head focuses on **local details**, another head focuses on **global structure**
+
+### Practical Example: Understanding the sentence "The animal didn't cross the street because it was too tired"
+
+**Head 1 (Syntactic Relationship):**
+
+Attention("it", "animal") = 0.8 (pronoun reference)
+
+**Head 2 (Causal Relationship):**
+
+Attention("didn't cross", "because") = 0.9 (causal connection)
+
+Attention("because", "tired") = 0.7 (reason explanation)
+
+**Head 3 (Semantic Relationship):**
+
+Attention("animal", "tired") = 0.6 (state description)
+
+**Why can't a single head do this?**
+
+- Single-head attention weights must be a **fixed distribution**
+- Cannot simultaneously emphasize "it points to animal" and "because connects cause"
+- Like you cannot simultaneously focus clearly on the foreground and background in one photo
+
+---
+
+### Technical Key Points Summary
+
+**Key points for answering this question:**
+
+1. **Multiple heads ≠ more parameters:** Same parameter count, but stronger expressive power
+
+2. **Subspace separation:** Each head learns different patterns in different subspaces
+
+3. **Ensemble learning idea:** Multiple weak learners (single heads) form a strong learner
+
+4. **Easier optimization:** Multiple small-dimensional heads are easier to train than a single large-dimensional head
+
+**One-sentence summary:**
+
+Multi-head attention achieves pattern diversity through space decomposition, allowing the model to learn richer attention patterns with the same parameter count. This is a "divide and conquer" wisdom!
+
+---
+
+# Day 4
+## Question:
+### <mark>How does Transformer's self-attention mechanism achieve "parallel processing"? Why is this so much faster than RNN?</mark>
+
+## Answer:
+
