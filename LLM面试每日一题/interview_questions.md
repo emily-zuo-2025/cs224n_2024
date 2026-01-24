@@ -870,3 +870,253 @@ Input → Self-Attention → Add & Norm → FFN → Add & Norm → Output
 * **Position**: After self-attention
 
 ##### In Simple Terms: FFN is Transformer's "deep understanding module". Self-attention is responsible for "seeing relationships" (global), FFN is responsible for "deep understanding" (local + nonlinearity). With both working together, Transformer can understand the global context and deeply understand the meaning of each word!
+
+
+# Day 16
+## Question:
+### <mark>What are the two mask mechanisms in Transformer? What problems do they each solve?</mark>
+
+## Answer:
+
+### Starting from Attention Calculation
+
+To understand mask, we first need to understand the attention calculation process. The core formula of self-attention is:
+
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+$$
+
+**There's a key point here:** softmax makes all positions get non-zero weights. Even if a certain position has a very low score, after softmax it will still get a small positive weight.
+
+**The problem arises:** In some scenarios, we need to make certain positions' weights **strictly 0**, not just "very small". This is where mask is needed.
+
+### In-depth Analysis of Two Mask Mechanisms
+
+#### 1. Padding Mask: Mathematical Technique for Handling Variable-Length Sequences
+
+**Why Do We Need Padding Mask?**
+
+**Hard requirement for batch parallel computation:** Matrix operations require shape alignment. Assume a batch:
+
+• Sentence A: [I, love, NLP] → length 3
+
+• Sentence B: [Transformer] → length 1
+
+To perform batch matrix multiplication, must pad to uniform length:
+
+• Sentence A: [I, love, NLP]
+
+• Sentence B: [Transformer, PAD, PAD]
+
+**Core Problem: PAD tokens pollute attention distribution**
+
+**What Happens Without Mask?**
+
+Suppose we calculate the attention scores for sentence B's Q matrix:
+
+$$
+\text{scores} = \frac{QK^T}{\sqrt{d_k}} = \begin{bmatrix} s_1 \\ s_2 \\ s_3 \end{bmatrix}
+$$
+
+Where $s_1$ is the score for "Transformer", $s_2, s_3$ are scores for the two PADs.
+
+After passing through softmax:
+
+$$
+\text{softmax}([s_1, s_2, s_3]) = \left[\frac{e^{s_1}}{Z}, \frac{e^{s_2}}{Z}, \frac{e^{s_3}}{Z}\right]
+$$
+
+**Key Problem:** Even if PAD's scores are low, they will still get part of the attention weight!
+
+**Solution: Set PAD positions to $-\infty$ before softmax**
+
+Modified formula:
+
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}} + M_{\text{pad}}\right)V
+$$
+
+Where the padding mask matrix is:
+
+$$
+M_{\text{pad}}[i, j] = \begin{cases} 
+0 & \text{if position } j \text{ is valid} \\
+-\infty & \text{if position } j \text{ is PAD}
+\end{cases}
+$$
+
+**Why $-\infty$ instead of 0?**
+
+Because it's an addition operation, we need to make the input to softmax become $-\infty$:
+
+$$
+\text{score} + (-\infty) = -\infty
+$$
+
+$$
+\text{softmax}(-\infty) = \frac{e^{-\infty}}{Z} = \frac{0}{Z} = 0
+$$
+
+This way, the weight for PAD positions is strictly 0!
+
+**Implementation Details: Shape Broadcasting Mechanism**
+
+**Key Question:** The shape of $QK^T$ is `[batch, heads, seq_len, seq_len]`, how to align with it?
+
+```python
+# input_ids shape: [batch, seq_len]
+padding_mask = (input_ids != PAD_TOKEN_ID)
+
+# Expand to [batch, 1, 1, seq_len]
+padding_mask = padding_mask.unsqueeze(1).unsqueeze(2)
+
+# Convert to additive mask (valid positions 0, PAD positions -inf)
+attention_mask = torch.where(padding_mask, 0.0, float('-inf'))
+```
+
+**Broadcasting mechanism:** `[batch, heads, seq_len, seq_len]` + `[batch, 1, 1, seq_len]` will automatically expand in the heads and query dimensions, allowing each query position to apply the mask to the same key positions.
+
+#### 2. Causal Mask: Necessary Constraint for Autoregressive Generation
+
+**The Essence of the Problem: Consistency Between Training and Inference**
+
+**Inference:** When generating the $t$-th word, can only see the previous $t-1$ words (autoregressive).
+
+**Training without mask:** The Decoder would see all target words simultaneously, equivalent to "cheating" - directly seeing future positions. This causes a huge gap between training and inference, and the model cannot learn true generation ability.
+
+**Mathematical Form of Causal Mask**
+
+This is a **lower triangular matrix**:
+
+$$
+M_{\text{causal}} = \begin{bmatrix}
+0 & -\infty & -\infty & -\infty \\
+0 & 0 & -\infty & -\infty \\
+0 & 0 & 0 & -\infty \\
+0 & 0 & 0 & 0
+\end{bmatrix}
+$$
+
+**Rule:** Position $i$ can only attend to position $j \leq i$
+
+$$
+M_{\text{causal}}[i, j] = \begin{cases}
+0 & \text{if } j \leq i \\
+-\infty & \text{if } j > i
+\end{cases}
+$$
+
+**Why Called "Causal"?**
+
+Causality requires: the cause must occur before the result. Causal Mask forces the model to follow temporal causal order—position $i$ can only be influenced by position $j < i$, not by the "future".
+
+**Implementation Technique: torch.tril**
+
+```python
+# Create a lower triangular matrix and convert to additive mask
+causal_mask = torch.tril(torch.ones(seq_len, seq_len))  # Lower triangular
+
+causal_mask = torch.where(causal_mask == 1, 0.0, float('-inf'))
+
+# Result: [[0, -inf, -inf, -inf],
+#          [0, 0, -inf, -inf],
+#          [0, 0, 0, -inf],
+#          [0, 0, 0, 0]]
+```
+
+shape `[seq_len, seq_len]` will broadcast to `[batch, heads, seq_len, seq_len]`.
+
+### Two Key Technical Questions
+
+**Question 1: Why Must Use $-\infty$?**
+
+The reason for using `float('-inf')` instead of a large negative number (like -10000):
+
+• $e^{-\infty}$ in PyTorch is strictly equal to 0 (IEEE 754 standard)
+
+• Large negative numbers only "approximate 0", there can be floating-point precision errors
+
+• Strictly 0 ensures the stability of gradient computation
+
+**Question 2: How to Combine Two Masks?**
+
+Decoder self-attention needs to apply both masks simultaneously:
+
+```python
+# Use torch.maximum to combine (for additive mask)
+combined_mask = torch.maximum(padding_mask, causal_mask)
+```
+
+**Logic:** Position $i$ can attend to position $j$, if and only if $j \leq i$ AND $j$ is not PAD.
+
+### Encoder vs Decoder: Mask Usage Differences
+
+**Encoder: Only Uses Padding Mask**
+
+• Task: Understand input sequence
+
+• Each position needs to see the entire context (global context)
+
+• Only need to mask PAD, no need for causal mask
+
+**Decoder Self-Attention: Padding Mask + Causal Mask**
+
+• Task: Generate output sequence
+
+• Must ensure causality (cannot see the future)
+
+• Also need to mask PAD
+
+**Decoder Cross-Attention: Only Uses Padding Mask (for Encoder Output)**
+
+• Each position in Decoder attends to all positions in Encoder
+
+• No need for causal mask (Encoder's output is bidirectional)
+
+• Only need to mask PAD in Encoder input
+
+### An Intuitive Example
+
+When generating "Hello World", the Decoder self-attention mask matrix:
+
+```python
+# Causal mask ensures cannot see future
+[[0, -inf],    # "Hello" can only see itself
+ [0, 0]]       # "World" can see "Hello" and itself
+
+# If Decoder input has PAD, need to combine padding mask
+combined_mask = torch.maximum(padding_mask, causal_mask)
+```
+
+And Decoder cross-attention only needs to mask Encoder's PAD, doesn't need causal mask (because Encoder output is bidirectional, can freely attend).
+
+### Summary: Back to the Core Question
+
+**Transformer's Two Mask Mechanisms:**
+
+**1. Padding Mask**
+- Solves problem: Variable-length sequences in batch are misaligned
+- Technical implementation: Add $-\infty$ in key dimension, making PAD weights strictly 0
+- Key point: Uses broadcasting mechanism to apply to all query positions
+
+**2. Causal Mask**
+- Solves problem: Consistency between training and inference, preventing information leakage
+- Technical implementation: Lower triangular matrix, position $i$ can only see $j \leq i$
+- Key point: Forces compliance with temporal causal order
+
+**Core Principle:**
+
+• Both perform addition operations before softmax
+
+• Utilize $e^{-\infty} = 0$ to make masked position weights strictly 0
+
+• Elegantly handle multi-dimensional tensors through broadcasting mechanism
+
+**Why Important:**
+
+• Without these two masks, Transformer cannot handle real-world data
+
+• Padding Mask makes batch training possible (efficiency)
+
+• Causal Mask makes autoregressive generation possible (correctness)
+
