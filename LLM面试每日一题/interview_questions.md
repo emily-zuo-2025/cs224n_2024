@@ -872,6 +872,15 @@ Input → Self-Attention → Add & Norm → FFN → Add & Norm → Output
 ##### In Simple Terms: FFN is Transformer's "deep understanding module". Self-attention is responsible for "seeing relationships" (global), FFN is responsible for "deep understanding" (local + nonlinearity). With both working together, Transformer can understand the global context and deeply understand the meaning of each word!
 
 
+
+
+
+
+
+
+
+
+
 # Day 16
 ## Question:
 ### <mark>What are the two mask mechanisms in Transformer? What problems do they each solve?</mark>
@@ -1090,7 +1099,7 @@ combined_mask = torch.maximum(padding_mask, causal_mask)
 
 And Decoder cross-attention only needs to mask Encoder's PAD, doesn't need causal mask (because Encoder output is bidirectional, can freely attend).
 
-### Summary: Back to the Core Question
+### Summary: Back to the Core 
 
 **Transformer's Two Mask Mechanisms:**
 
@@ -1120,3 +1129,364 @@ And Decoder cross-attention only needs to mask Encoder's PAD, doesn't need causa
 
 • Causal Mask makes autoregressive generation possible (correctness)
 
+
+# Day 15
+## Question:
+### <mark>Transformer networks are very deep, how do they avoid overfitting problems?</mark>
+
+## Answer:
+
+### The Essence of the Problem
+
+Transformer (such as BERT-Large with 24 layers and 340M parameters) - why doesn't it severely overfit? The core of this question lies in: **the network capacity far exceeds the data volume, theoretically it should easily "memorize" all training samples**.
+
+**Mathematical nature of overfitting:**
+
+• Model complexity >> Data complexity
+
+• Training error → 0, test error ↑
+
+• Model learns "noise" rather than "patterns"
+
+So, how does Transformer maintain depth while avoiding overfitting?
+
+### Core Mechanism 1: Dropout—The Art of Random Dropout
+
+**Why Is Dropout Effective? Deep Principle**
+
+**Traditional understanding:** Dropout randomly "closes" neurons, preventing overfitting.
+
+**Deep principle:** Dropout is actually **training an exponential-level number of sub-networks**!
+
+**Mathematical explanation:**
+
+Each forward pass, Dropout randomly samples a sub-network:
+
+$$
+\hat{y} = f(x; \theta \odot m)
+$$
+
+Where:
+
+• $m \sim \text{Bernoulli}(1-p)$: random mask
+
+• $\theta \odot m$: activated parameter set
+
+**Key insight:** If there are $n$ units that can be Dropped, theoretically $2^n$ different sub-networks can be generated!
+
+**Three Applications in Transformer:**
+
+**1. Dropout on Attention Weights (Most Critical!)**
+
+• FFN is Transformer's "memory unit"
+
+• Dropout prevents FFN from memorizing specific patterns in training samples
+
+• Each neuron must learn to "still work when other neurons fail"
+
+**3. Dropout on Residual Connections**
+
+```python
+# Complete Transformer layer
+x = x + dropout(Attention(LN(x)))  # Residual connection
+x = x + dropout(FFN(LN(x)))        # Residual connection
+```
+
+**Why Design It This Way?**
+
+• Dropout before residual connection allows the model to "optionally skip this layer"
+
+• Equivalent to training networks of different depths
+
+• Produces **implicit deep ensemble effect**
+
+**Dropout's Ensemble Perspective**
+
+**Amazing theory:** Dropout = training an exponential-level model ensemble!
+
+**During testing:**
+
+$$
+y = \mathbb{E}_m[f(x; \theta \odot m)] \approx f(x; (1-p) \cdot \theta)
+$$
+
+• During training: sample one of $2^n$ sub-networks
+
+• During testing: use "average" of all sub-networks (through scaling approximation)
+
+• Equivalent to **free model ensemble**!
+
+### Core Mechanism 2: Residual Connections—Deeper Than You Imagine
+
+**Three Identities of Residual Connections**
+
+**Identity 1: Gradient Highway**
+
+$$
+\frac{\partial L}{\partial x_l} = \frac{\partial L}{\partial x_L} \cdot \prod_{i=l}^{L-1} \left(I + \frac{\partial F_i}{\partial x_i}\right)
+$$
+
+**Key points:**
+
+• Gradient always contains identity matrix $I$
+
+• Even if $\frac{\partial F_i}{\partial x_i}$ is small, gradient won't vanish
+
+• Allows deep networks to be trained effectively
+
+**Identity 2: Implicit Deep Ensemble**
+
+**Amazing theory (Veit et al., 2016):**
+Residual networks are actually **ensembles of exponentially many shallow networks**!
+
+**Why?** Consider a 3-layer residual network:
+
+$$
+x_1 = x_0 + F_1(x_0)
+$$
+
+$$
+x_2 = x_1 + F_2(x_1) = x_0 + F_1(x_0) + F_2(x_1)
+$$
+
+$$
+x_3 = x_2 + F_3(x_2) = x_0 + F_1 + F_2 + F_3 + F_2 \circ F_1 + \cdots
+$$
+
+**After expansion:** The final output is a combination of all possible paths!
+
+• 3-layer network has $2^3 = 8$ paths
+
+• 24-layer BERT has $2^{24} \approx 16$ million paths!
+
+• Each path is a "sub-network"
+
+• Residual network = implicit ensemble learning
+
+**Identity 3: Smooth Loss Surface**
+
+**Latest research (Li et al., 2018) found:**
+
+• Residual connections make the loss function more "smooth"
+
+• Smooth loss → better generalization ability
+
+• Mathematically: residual connections reduce the Lipschitz constant of the loss function
+
+### Core Mechanism 3: Layer Normalization—The Underestimated Regularizer
+
+**LN's Hidden Ability**
+
+**Standard understanding:** Layer Norm stabilizes training.
+
+**Deep role:** Layer Norm is actually **implicit regularization**!
+
+**Mathematical expression:**
+
+$$
+\text{LN}(x) = \gamma \cdot \frac{x - \mu}{\sigma + \epsilon} + \beta
+$$
+
+**Why Can It Prevent Overfitting?**
+
+**1. Limit Activation Value Range**
+
+• No matter how large the weights are, activation values are always normalized
+
+• Prevents weights from "exploding"
+
+• Equivalent to adding implicit constraints to activation values
+
+**2. Pre-LN vs Post-LN Difference**
+
+```python
+# Post-LN (original Transformer)
+x = LN(x + Sublayer(x))
+
+# Pre-LN (modern Transformer, like GPT)
+x = x + Sublayer(LN(x))
+```
+
+• Gradient flow more stable
+
+• No need for learning rate warm-up
+
+• **Better generalization ability** (experimental observation)
+
+**Theoretical explanation:**
+
+• Pre-LN ensures that the input seen by each layer is normalized
+
+• Limits each layer's "destructive power" to inputs
+
+• Forces the model to learn more "gentle" transformations
+
+### Core Mechanism 4: Weight Decay—A Direct Root of Overfitting
+
+**Understanding Weight Decay from a Bayesian Perspective**
+
+**Traditional understanding:** L2 regularization = penalizing large weights
+
+**Deep understanding:** Weight decay = introducing prior distribution on weights!
+
+**Bayesian interpretation:**
+
+Assume weights follow Gaussian prior: $w \sim \mathcal{N}(0, \frac{1}{2\lambda})$
+
+Maximum a posteriori estimation (MAP):
+
+$$
+\hat{w} = \arg\max_w P(w|D)
+$$
+
+$$
+= \arg\max_w [P(D|w) \cdot P(w)]
+$$
+
+$$
+= \arg\min_w [-\log P(D|w) - \log P(w)]
+$$
+
+$$
+= \arg\min_w [L_{\text{task}} + \lambda ||w||^2]
+$$
+
+**Insights:**
+
+• L2 regularization = assuming weights should approach 0
+
+• This is an **inductive bias**
+
+• Biased toward "simpler" solutions (Occam's Razor)
+
+**Special Role of Weight Decay in Transformer**
+
+**Why Is It Particularly Effective for Transformer?**
+
+**1. Stability of Attention Matrix**
+
+• If QKV matrices are too large → attention scores are too extreme
+
+• After softmax becomes one-hot → loses global information
+
+• Weight decay keeps attention distribution more "smooth"
+
+**2. Memory Control of FFN**
+
+• FFN has a huge number of parameters (4x hidden layer dimension)
+
+• Easy to overfit
+
+• Weight decay limits FFN's "memorization ability"
+
+### Synergistic Effect of Mechanisms—1+1+1+1 > 4
+
+These four mechanisms are not independent, but form a **multi-layer defense system**:
+
+**First Layer Defense: Randomness During Training (Dropout)**
+
+• Time of action: each batch
+
+• Mode of action: random sub-network sampling
+
+• Prevents: memorizing specific samples
+
+**Second Layer Defense: Structural Internal Constraints (Residual + LN)**
+
+• Time of action: network structure level
+
+• Mode of action: smooth loss, limit activation
+
+• Prevents: gradient problems and unstable training
+
+**Third Layer Defense: Explicit Constraints on Parameters (Weight Decay)**
+
+• Time of action: each parameter update
+
+• Mode of action: pull weights toward 0
+
+• Prevents: overly large parameters and complex models
+
+**Synergistic effect:**
+
+```
+Dropout (randomly sampling sub-networks)
+    ↓
+Residual (implicitly ensembles multiple paths)
+    ↓
+Layer Norm (normalizes each layer's input)
+    ↓
+Weight Decay (constrains parameter space)
+    ↓
+Final effect: deep network + strong generalization ability
+```
+
+### Numerical Example: BERT's Actual Configuration
+
+**BERT-Base actual parameters:**
+
+```python
+hidden_size = 768
+num_layers = 12
+num_attention_heads = 12
+intermediate_size = 3072  # FFN dimension
+
+# Regularization configuration
+attention_probs_dropout_prob = 0.1    # Attention Dropout
+hidden_dropout_prob = 0.1             # Hidden layer Dropout
+weight_decay = 0.01                   # L2 regularization coefficient
+```
+
+**Calculation: Possible sub-network count**
+
+Assume each layer has 2 Dropout positions (attention + FFN):
+
+• Total Dropout positions: $12 \times 2 = 24$
+
+• Theoretical sub-network count: $2^{24} \approx 16,777,216$
+
+• **16 million model implicit ensemble!**
+
+**This explains why:**
+
+• BERT can fine-tune on small datasets
+
+• Good transfer learning performance
+
+• Strong generalization ability
+
+### Summary: The Philosophy of Deep Networks Not Overfitting
+
+**Core idea:** It's not about avoiding overfitting, but about **finding balance between overfitting and underfitting**.
+
+**The essence of the four mechanisms:**
+
+1. **Dropout**: Train countless sub-networks → ensemble learning
+
+2. **Residual**: Create multiple paths → implicit ensemble
+
+3. **Layer Norm**: Smooth transformation → limit complexity
+
+4. **Weight Decay**: Bayesian prior → bias toward simplicity
+
+**One-sentence summary:** Transformer, through "randomization" (Dropout), "ensembling" (Residual), "smoothing" (LN), and "regularization" (Weight Decay) four mechanisms, transforms a super-large-capacity deep network into an ensemble of countless regularized sub-networks, thereby avoiding overfitting!
+
+# Day 17
+## Question:
+### <mark>Why does Transformer use Layer Norm? What is its function/role?</mark>
+
+## Answer:
+
+### Core Problem: "Variance Explosion" in Self-Attention Mechanism
+
+To understand why Layer Norm is needed, we must first understand **what problems the self-attention mechanism has**.
+
+Next, we will briefly introduce why Transformer uses Layer Norm, and how Layer Norm solves problems such as variance and distribution instability brought by the self-attention mechanism.
+
+**The overall flow:**
+
+• Analyze the statistical distribution changes and potential risks when self-attention and feedforward networks are stacked deeply
+
+• Explain the core principles of Layer Norm
+
+• Describe the specific benefits it brings to Transformer
