@@ -668,3 +668,205 @@ Generated Sequence → Masked Self-Attention → Cross-Attention → FFN → Nex
 3. **Different design goals**: Encoder is optimized for understanding, Decoder is optimized for generation
 
 Understanding these details of the attention mechanism helps you understand the fundamental differences between Encoder and Decoder!
+
+# Day 13
+## Question:
+### <mark># Feed-Forward Network (FFN) in Transformer What is its purpose? Why is it needed?</mark>
+
+## Answer:
+## What is a Feed-Forward Network?
+
+**Feed-Forward Network (FFN)** is an important component of each Transformer layer, located after the self-attention layer.
+
+### Structure:
+
+* Two-layer fully connected network
+
+* Contains a nonlinear activation function in the middle (typically ReLU or GELU)
+* ## Mathematical Expression of FFN
+
+### Standard FFN Formula:
+
+FFN(x) = max(0, xW₁ + b₁)W₂ + b₂
+
+### Or in more general form:
+
+FFN(x) = Activation(xW₁ + b₁)W₂ + b₂
+
+### Parameter Description:
+
+* W₁ ∈ ℝ^(d_model × d_ff): First layer weight matrix
+
+* W₂ ∈ ℝ^(d_ff × d_model): Second layer weight matrix
+
+* d_ff: Typically set to 4 × d_model (In BERT, d_model = 768, d_ff = 3072)
+
+* Activation: Activation function (ReLU or GELU)
+
+## Role of FFN
+## 1. Nonlinear Transformation 💫
+
+### Core Function: Enhance the model's nonlinear expression capability
+
+### Why is nonlinearity needed?
+
+### Limitations of Self-Attention Layer:
+
+* Self-attention is mainly a **linear transformation** combination
+
+* QK^T is a linear operation
+
+* Even with softmax, the overall structure is still a **linear combination**
+
+### Role of FFN:
+
+* Introduce **nonlinearity** through activation functions
+
+* Allow the model to learn **complex feature combinations**
+
+* Improve the model's expression capability
+
+### Mathematical Intuition:
+
+* Without FFN: The model can only learn linear relationships
+
+* With FFN: The model can learn nonlinear relationships (e.g., "If A and B, then C")
+## 3. Increase Model Capacity 📈
+
+### FFN Parameter Count:
+
+For d_model = 768, d_ff = 3072:
+
+* W₁: 768 × 3072 = 2.36M parameters
+
+* W₂: 3072 × 768 = 2.36M parameters
+
+* **Total: ~4.7M parameters (the majority of a single layer's parameters!)**
+
+### Why is such large capacity needed?
+
+* Need to learn complex feature transformations
+
+* Provide sufficient "memory space" for the model
+
+* Allow the model to store and extract complex information
+
+## FFN Design Details
+## 1. Dimension Design: Why d_ff = 4 × d_model?
+
+### Empirical Rule:
+
+* Typically set d_ff = 4 × d_model
+
+* This is an **empirical value** that performs well in multiple experiments
+
+### Reasons:
+
+* Too small (e.g., d_ff = d_model): Insufficient expression capability
+
+* Too large (e.g., d_ff = 8 × d_model): Parameter explosion, prone to overfitting
+
+* 4 × d_model is a **balance point**
+* ## 2. Choice of Activation Function
+
+### ReLU (Original Transformer):
+
+ReLU(x) = max(0, x)
+
+### GELU (BERT and Modern Models):
+
+GELU(x) = xΦ(x)
+
+Where Φ(x) is the cumulative distribution function of the standard normal distribution.
+
+### Why use GELU?
+
+* GELU is **smooth**, with more stable gradients
+
+* Performs better in deep networks
+
+* Experiments show performance slightly better than ReLU
+## FFN's Position in Transformer
+
+### Complete Structure of Transformer Layer:
+
+```
+Input → Self-Attention → Add & Norm → FFN → Add & Norm → Output
+```
+
+### Information Flow:
+
+1. **Self-Attention**: Capture global relationships
+
+2. **Residual Connection**: Preserve original information
+
+3. **Layer Normalization**: Stabilize training
+
+4. **FFN**: Nonlinear transformation, capture local features
+
+5. **Residual Connection**: Preserve information again
+
+6. **Layer Normalization**: Stabilize again
+## Why is FFN Necessary?
+
+### What if there was no FFN?
+
+### Experimental Evidence:
+
+* Transformer without FFN shows **significant performance degradation**
+
+* Model cannot learn complex feature combinations
+
+* Expression capability is limited
+
+### Reasons:
+
+* Self-attention can only do **linear combinations**
+
+* Without nonlinearity, the model is like a "linear classifier"
+
+* Cannot handle complex language patterns
+## Practical Example
+
+### Understanding the sentence: "That little cat playing ball in the park is cute"
+
+### Role of Self-Attention:
+
+* Let "little cat" pay attention to words like "that", "playing ball", "cute"
+
+* Establish relationships between words
+
+### Role of FFN:
+
+* Deeply understand the meaning of the word "little cat" itself
+
+* Extract the feature representation of "little cat"
+
+* Perform complex feature transformations
+
+### Combination of Both:
+
+* Self-Attention: Understand contextual relationships
+
+* FFN: Understand the meaning of the words themselves
+
+* **Both are indispensable!**
+## Summary
+
+### Core Value of FFN:
+
+1. **Nonlinear Transformation**: Allow the model to learn complex patterns
+
+2. **Local Features**: Capture position-specific information
+
+3. **Model Capacity**: Provide sufficient expression capability
+
+### Design Points:
+
+* **Dimension**: Typically d_ff = 4 × d_model
+
+* **Activation Function**: GELU is preferred over ReLU
+
+* **Position**: After self-attention
+
+##### In Simple Terms: FFN is Transformer's "deep understanding module". Self-attention is responsible for "seeing relationships" (global), FFN is responsible for "deep understanding" (local + nonlinearity). With both working together, Transformer can understand the global context and deeply understand the meaning of each word!
