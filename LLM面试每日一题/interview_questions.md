@@ -1490,3 +1490,566 @@ Next, we will briefly introduce why Transformer uses Layer Norm, and how Layer N
 • Explain the core principles of Layer Norm
 
 • Describe the specific benefits it brings to Transformer
+# Problem 1: Variance Explosion in Dot-Product Attention 💥
+
+## Self-Attention Calculation:
+
+$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+
+## Where is the problem?
+
+Assume each element of $Q$ and $K$ is **independently and identically distributed**, with mean 0 and variance 1. Then:
+
+• **Variance of the dot product $QK^T$**: Since $d_k$ elements are multiplied and summed, the variance **accumulates**
+
+• $\text{Var}(QK^T) \approx d_k$
+
+• When $d_k = 64$, the variance is amplified by **64 times**!
+
+• **Why divide by $\sqrt{d_k}$?**
+
+• The scaling factor $\frac{1}{\sqrt{d_k}}$ pulls the variance back to 1
+
+• $\text{Var}\left(\frac{QK^T}{\sqrt{d_k}}\right) \approx 1$
+
+## But this is not enough! Even with the scaling factor:
+
+1. **Softmax changes the distribution**: The output after softmax is not a standard distribution
+
+2. **Multi-head concatenation accumulates**: After concatenating 8 heads, the feature dimension expands 8 times, and variance starts accumulating again
+
+3. **Deep layer accumulation effect**: After passing through multiple layers, even if each layer has only tiny deviations, they will accumulate into a major problem
+
+---
+
+# Problem 2: FFN Output Variance is Also Unstable
+
+## FFN Structure:
+
+$$\text{FFN}(x) = W_2 \cdot \text{ReLU}(W_1x + b_1) + b_2$$
+
+## Problems:
+
+• **ReLU changes variance** (approximately halved, because negative values are truncated)
+
+• **Linear transformation $W_2$ further amplifies or reduces variance**
+
+• **Variance differences between different layers are very large**
+
+## How does Layer Norm solve these problems?
+
+### Mathematical Principles
+
+**Layer Norm Formula:**
+
+$$\text{LayerNorm}(x) = \gamma \odot \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}} + \beta$$
+
+Where:
+
+• $\mu = \frac{1}{d} \sum_{i=1}^{d} x_i$ (mean across feature dimensions)
+
+• $\sigma^2 = \frac{1}{d} \sum_{i=1}^{d}(x_i - \mu)^2$ (variance across feature dimensions)
+
+**Key Effects:**
+
+• **Stabilizes output distribution**: After normalization, mean is 0 and variance is 1
+
+• **Eliminates accumulation effect**: No matter how large the input variance, the output variance is "reset" to 1
+
+• **Learnable parameters $\gamma, \beta$**: Allows the model to adjust the distribution as needed
+
+### Why Normalize Across "Feature Dimensions"?
+
+**Compared to Batch Norm:**
+
+|                             | **Batch Norm**                         | **Layer Norm**                         |
+| --------------------------- | -------------------------------------- | -------------------------------------- |
+| **Normalization Dimension** | Batch dimension                        | Feature dimension                      |
+| **Statistics Calculation**  | $\mu = \frac{1}{B} \sum_{i=1}^{B} x_i$ | $\mu = \frac{1}{d} \sum_{j=1}^{d} x_j$ |
+| **Application Scenario**    | Images (CNN)                           | Sequences (Transformer)                |
+
+**Why does Transformer use Layer Norm?**
+
+1. **Sequence lengths are unstable**: Different samples in a batch may have different sequence lengths, making it impossible to unify normalization across the batch dimension
+
+2. **Inference with batch=1**: During single-sample inference, batch statistics cannot be used
+
+3. **Attention focuses on feature relationships**: Normalization across feature dimensions is more reasonable
+
+### The Role of Layer Norm in Gradient Flow
+
+**This is the most critical but often overlooked part!**
+
+#### Gradient Flow Problem
+
+**Without Layer Norm:**
+
+During backpropagation, gradients need to pass through multiple layers:
+
+$$\frac{\partial L}{\partial x_0} = \frac{\partial L}{\partial x_L} \cdot \frac{\partial x_L}{\partial x_{L-1}} \cdots \frac{\partial x_1}{\partial x_0}$$
+
+**Problems:**
+
+• If each $\frac{\partial x_{l+1}}{\partial x_l}$ is **slightly greater than 1**, gradients will **explode exponentially**
+
+• If each $\frac{\partial x_{l+1}}{\partial x_l}$ is **slightly less than 1**, gradients will **vanish exponentially**
+
+#### How Does Layer Norm Stabilize Gradients?
+
+**Key Insight: The Jacobian of the Normalization Operation**
+
+Layer Norm's gradient:
+
+$$\frac{\partial \text{LN}(x)}{\partial x} = \frac{\gamma}{\sigma}\left(I - \frac{1}{d}\mathbf{1}\mathbf{1}^T - \frac{(x-\mu)(x-\mu)^T}{\sigma^2}\right)$$
+
+**Important Properties:**
+
+1. **Gradient magnitude is controlled**: Due to normalization, gradients won't arbitrarily expand or shrink
+
+2. **Removes gradient in the mean direction**: The term $I - \frac{1}{d}\mathbf{1}\mathbf{1}^T$ removes the mean direction
+
+3. **Residual connections provide direct path**: $x_{l+1} = x_l + \text{LN}(\text{Sublayer}(x_l))$ provides a gradient "highway"
+
+**Combined with Residual Connections:**
+
+$$x_{l+1} = x_l + \text{Sublayer}(x_l)$$
+
+Gradient becomes:
+
+$$\frac{\partial x_{l+1}}{\partial x_l} = I + \frac{\partial \text{Sublayer}}{\partial x_l}$$
+
+• **Identity term $I$**: Ensures gradients have at least one "direct" path
+
+• **Layer Norm stabilizes the second term**: Ensures $\frac{\partial \text{Sublayer}}{\partial x_l}$ doesn't explode
+
+## Pre-LN vs Post-LN: Position Matters!
+
+### Post-LN (Original Transformer)
+
+$$x_{l+1} = \text{LN}(x_l + \text{Sublayer}(x_l))$$
+
+**Problems:**
+
+• **Residual path is also normalized, gradients cannot flow directly**
+
+• **Training is unstable in early stages, requires learning rate warmup**
+
+• **Deep models are difficult to train**
+
+### Pre-LN (Modern Transformer, e.g., GPT)
+
+$$x_{l+1} = x_l + \text{Sublayer}(\text{LN}(x_l))$$
+
+**Advantages:**
+
+• **Residual path is clean, gradients can flow directly**
+
+• **Training is more stable, no need for warmup**
+
+• **Can train deeper models (GPT-3 has 96 layers)**
+
+**Mathematical Intuition:**
+
+Gradient:
+
+$$\frac{\partial x_{l+1}}{\partial x_l} = I + \frac{\partial \text{Sublayer}}{\partial \text{LN}(x_l)} \cdot \frac{\partial \text{LN}}{\partial x_l}$$
+
+• **$I$ term is unaffected**: Gradients can always flow back
+
+• **Layer Norm only affects sublayer's gradient, doesn't block the main path**
+
+## Quantitative Analysis of Practical Effects
+
+**Without Layer Norm:**
+
+• Learning rate needs to be < 0.0001 (otherwise training is unstable)
+
+• Takes 10000 steps to converge
+
+• Depth over 12 layers is very difficult to train
+
+**With Layer Norm + Pre-LN:**
+
+• Learning rate can use 0.001 (10x larger)
+
+• Converges in 1000 steps
+
+• Can train up to 96 layers or even deeper
+
+**Why can we use a larger learning rate?**
+
+Because Layer Norm keeps the input-output scale of each layer relatively similar:
+
+• **Learning rate is equivalent to "step size"**
+
+• **If scales differ by 10x between layers, the same step size may be too large for some layers and too small for others**
+
+• **After Layer Norm unifies the scale, a larger unified step size can be used**
+
+## Summary: Key Points for Answering Interview Questions
+
+### First-Level Answer (Basic):
+
+• Layer Norm normalizes across feature dimensions, **stabilizes the input distribution of each layer**
+
+• **Does not depend on batch size**, suitable for variable-length sequences
+
+### Second-Level Answer (Advanced):
+
+• Self-attention's dot product and multi-head concatenation **cause variance accumulation**
+
+• Layer Norm **strongly controls the distribution of each layer** through normalization
+
+• Combined with residual connections, provides **stable gradient flow**
+
+### Third-Level Answer (Deep Dive):
+
+• Layer Norm's Jacobian **controls gradient magnitude**
+
+• Pre-LN **keeps the residual path "clean"**, allowing gradients to **flow directly**
+
+• This enables Transformer to use **larger learning rates** and train **deeper models**
+
+### One-Sentence Summary:
+
+Layer Norm is one of the **core technologies** that makes Transformer trainable. By stabilizing the distribution and gradient flow of each layer, it solves the training difficulties of deep attention networks.
+
+# Day 14
+## Question:
+### <mark>What's the difference between Pre-norm and Post-norm? Why do modern models all use Pre-norm?</mark>
+
+## Answer:
+
+### Core Difference: Mathematical Formula Difference
+
+This is the most fundamental difference, determining all subsequent characteristic differences.
+
+**Post-norm (Original Transformer):**
+
+$$x_{l+1} = \text{LayerNorm}(x_l + \text{Sublayer}(x_l))$$
+
+**Pre-norm (Modern Variant):**
+
+$$x_{l+1} = x_l + \text{Sublayer}(\text{LayerNorm}(x_l))$$
+
+It seems like just swapping the order of LayerNorm and residual connection? But this tiny adjustment brings huge differences!
+
+### Why is Pre-norm Training More Stable? The Key is in the Gradients!
+
+This is a core interview topic. Let's deeply analyze the differences in gradient flow.
+
+#### Post-norm's Gradient Dilemma
+
+In Post-norm, the path during gradient backpropagation:
+
+$$\frac{\partial L}{\partial x_l} = \frac{\partial L}{\partial x_{l+1}} \cdot \frac{\partial \text{LayerNorm}}{\partial(x_l + \text{Sublayer}(x_l))} \cdot \left(1 + \frac{\partial \text{Sublayer}(x_l)}{\partial x_l}\right)$$
+
+**Where's the problem?**
+
+**1. Gradients must go through LayerNorm's Jacobian matrix**
+   - LayerNorm's gradient contains a $\frac{1}{\sigma}$ term (reciprocal of standard deviation)
+   - When the activation value distribution is unstable, $\sigma$ can be very small or very large
+   - Causing gradients to be **excessively amplified or reduced**
+
+**2. Residual connection is inside LayerNorm**
+   - Gradients cannot "bypass" LayerNorm to flow back directly
+   - Each layer must go through LayerNorm's transformation
+   - In deep networks, this transformation **accumulates**
+
+#### Pre-norm's Gradient Advantage
+
+In Pre-norm, the path during gradient backpropagation:
+
+$$\frac{\partial L}{\partial x_l} = \frac{\partial L}{\partial x_{l+1}} \cdot \left(1 + \frac{\partial \text{Sublayer}}{\partial \text{LayerNorm}(x_l)} \cdot \frac{\partial \text{LayerNorm}(x_l)}{\partial x_l}\right)$$
+
+**The key difference:**
+
+$$\frac{\partial L}{\partial x_l} = \frac{\partial L}{\partial x_{l+1}} + \text{(sublayer's gradient contribution)}$$
+
+**Notice? The gradient has a constant term of 1!**
+
+**This means:**
+
+• **Residual connection provides a "highway"**: Gradients can flow directly from $x_{l+1}$ back to $x_l$, without going through any transformation
+
+• **Even if the sublayer's gradient is very small (second term approaches 0), gradients can still flow back through the constant mapping**
+
+• **LayerNorm's instability is "bypassed"**
+
+#### Using an Analogy to Understand
+
+**Post-norm:** Every road must pass through toll stations (LayerNorm), toll stations may be blocked or very slow
+
+**Pre-norm:** There's a direct express highway (constant mapping), even if regular roads are blocked, the highway remains open
+
+### Accumulation Effect in Deep Networks
+
+**Why is the difference small in shallow networks (6 layers)?**
+
+• Gradients only go through 6 transformations, accumulation effect is not obvious
+
+**Why is the difference huge in deep networks (24+ layers)?**
+
+Assuming each layer's gradient is scaled by $\alpha$ times:
+
+• **Post-norm:** Gradient is scaled by $\alpha^{24}$ times
+
+• **Pre-norm:** Gradient has at least a floor value of 1 (identity mapping)
+
+**If $\alpha = 0.9$ (seemingly close to 1):**
+
+• **Post-norm:** $0.9^{24} \approx 0.08$ (gradient vanishing!)
+
+• **Pre-norm:** Gradient can still flow
+
+### Experimental Data Support
+
+Research paper "On Layer Normalization in the Transformer Architecture" found:
+
+**Gradient norm comparison (24-layer network):**
+
+• **Post-norm:** Gradient norms in the first few layers are **1000+ times larger** than in the later layers
+
+• **Pre-norm:** Gradient norms across layers are relatively **balanced** (difference within 10x)
+
+**This explains why:**
+
+• **Post-norm requires very small learning rates** (to avoid updating the first few layers too fast)
+
+• **Post-norm requires very long warmup** (to gradually stabilize gradients)
+
+• **Pre-norm can be trained directly with large learning rates**
+
+### A Common Misconception
+
+**Misconception:** Pre-norm's input is normalized, so it's more stable
+
+**Truth:** Pre-norm's output is not normalized!
+
+• Pre-norm's output is $x_l + \text{Sublayer}(\text{LayerNorm}(x_l))$
+
+• This output's distribution may deviate from normalization
+
+**So why is Pre-norm still better?**
+
+• Because the key is not output distribution, but **gradient flow**
+
+• Pre-norm's residual connection ensures gradients can flow back stably, **that's the core**
+
+### Summary: How to Answer Interview Questions
+
+**Q: What's the difference between Pre-norm and Post-norm?**
+
+**A:** The difference lies in the order of LayerNorm and residual connection:
+
+• **Post-norm:** $\text{LayerNorm}(x + \text{Sublayer}(x))$
+
+• **Pre-norm:** $x + \text{Sublayer}(\text{LayerNorm}(x))$
+
+**Q: Why do modern models all use Pre-norm?**
+
+**A:** The core reason is **gradient flow is more stable**. In Pre-norm, the residual connection is outside LayerNorm, so during backpropagation gradients can flow back directly through identity mapping, without being affected by LayerNorm's instability. In Post-norm, gradients must go through LayerNorm, making it easy to accumulate gradient vanishing or explosion in deep networks.
+
+**Bonus point:** You can mention that in the gradient formula Pre-norm has a constant term of 1, ensuring gradients have at least one "highway", which is particularly important in deep networks (24+ layers).
+
+### Practical Applications
+
+**Models using Post-norm:**
+
+• Original Transformer (2017)
+
+• Early BERT
+
+**Models using Pre-norm:**
+
+• GPT-2 (2019)
+
+• GPT-3 (2020)
+
+• T5 (2020)
+
+• Modern BERT variants
+
+**Trend:**
+
+• Modern models universally adopt Pre-norm
+
+• Because it's more suitable for training deep networks
+
+### Summary
+
+**Pre-norm vs Post-norm:**
+
+| Characteristic         | Post-norm            | Pre-norm          |
+| ---------------------- | -------------------- | ----------------- |
+| Normalization Position | After sublayer       | Before sublayer   |
+| Training Stability     | Poor (deep layers)   | Better            |
+| Gradient Flow          | May be unstable      | More stable       |
+| Applicable Depth       | Shallow (<12 layers) | Deep (12+ layers) |
+| Learning Rate          | Needs to be smaller  | Can use larger    |
+
+**Core Reasons:**
+
+• Pre-norm ensures the input to each sublayer is normalized
+
+• Residual connection provides a direct gradient path
+
+• More suitable for training deep networks
+
+**Simple explanation:** Pre-norm is like "organize first, then work", Post-norm is like "work first, then organize". In deep networks, "organizing first" allows each step to start from a clean state, avoiding problem accumulation. This is why modern large models all use Pre-norm!
+
+# Day 18
+## Question:
+### <mark>How do the Encoder and Decoder in Transformer interact with each other?</mark>
+
+## Answer:
+
+### Core Answer
+
+**Encoder and Decoder interact through Cross-Attention: The Decoder uses its own Query to "query" the Encoder's Key-Value to extract input information.**
+
+First, let's look at the core mechanism: Generation and computation of Q, K, V
+
+Cross-Attention generates Query, Key, Value through **three independent linear projection matrices**:
+
+$$Q = H_{dec}W_Q, \quad K = H_{enc}W_K, \quad V = H_{enc}W_V$$
+
+**Key points:**
+
+• $H_{dec}$: Decoder's output (shape: $[n_{tgt} \times d_{model}]$)
+
+• $H_{enc}$: Encoder's output (shape: $[n_{src} \times d_{model}]$)
+
+• Projection matrices $W_Q, W_K, W_V$ are **learnable parameters**, projecting Decoder and Encoder into the same semantic space
+
+**Why do we need projection?**
+
+1. **Semantic alignment**: Let different sequences "dialogue" in the same space
+
+2. **Dimensionality optimization**: Usually $d_k = d_{model}/h$ ($h$ is number of heads), reduces computation
+
+3. **Learnability**: Model learns "how to ask" and "how to answer"
+
+---
+
+#### 2. Multi-Head Mechanism: Learn Multiple Alignment Patterns in Parallel
+
+$$\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)W_O$$
+
+**Advantage of multi-head**: Different heads learn different alignment relationships
+
+• **Head 1**: Vocabulary alignment ("I" → "我")
+
+• **Head 2**: Grammatical structure alignment (subject → subject)
+
+• **Head 3**: Semantic relationship alignment (action → action)
+
+Each head has independent $W_Q^i, W_K^i, W_V^i$, finally through $W_O$ to fuse all heads' outputs.
+
+#### 3. Dimension Transformation Flow
+
+**Assumption:** $n_{src} = 10, n_{tgt} = 8, d_{model} = 512, h = 8, d_k = 64$
+
+**1. Input:**
+- Decoder: [8 × 512]
+- Encoder: [10 × 512]
+
+**2. Projection (single head):**
+- Q: [8 × 512] × [512 × 64] = [8 × 64]
+- K: [10 × 512] × [512 × 64] = [10 × 64]
+- V: [10 × 512] × [512 × 64] = [10 × 64]
+
+**3. Attention computation:**
+- QK^T: [8 × 64] × [64 × 10] = [8 × 10] ← Alignment matrix
+- After Softmax: [8 × 10] × [10 × 64] = [8 × 64]
+
+**4. Multi-head concatenation and output:**
+- Concat(8 heads): [8 × 512]
+- Final output: [8 × 512] ← Same dimensions as Decoder input
+
+**Core understanding**: The attention matrix $[n_{tgt} \times n_{src}]$ records complete alignment relationships.
+
+#### 4. Essential Differences from Self-Attention
+
+| Dimension        | Self-Attention                    | Cross-Attention             |
+| ---------------- | --------------------------------- | --------------------------- |
+| Q Source         | Same sequence                     | Decoder sequence            |
+| K, V Source      | Same sequence                     | Encoder sequence            |
+| Attention Matrix | $[n \times n]$                    | $[n_{tgt} \times n_{src}]$  |
+| Function         | Internal modeling within sequence | Alignment between sequences |
+
+**Elegant fact**: The computation formula is completely identical $\text{softmax}(QK^T/\sqrt{d_k})V$, **the only difference is the source of Q, K, V**.
+
+#### 5. Practical Example: Translating "I love you"
+
+**Scenario:** Encoder input ["I", "love", "you"], Decoder has generated ["我"], now generating the second word.
+
+**Computation process:**
+
+1. **Projection**: Decoder's "我" generates Query, Encoder's three words generate Key and Value
+
+2. **Similarity computation (omitting scaling):**
+   - Q · K_I = 15.2 / 8 = 1.9
+   - Q · K_love = 32.8 / 8 = 4.1 ← Highest!
+   - Q · K_you = 8.5 / 8 = 1.1
+
+3. **Softmax normalization:**
+   - Attention_I = 0.10
+   - Attention_love = 0.85 ← Highest weight!
+   - Attention_you = 0.05
+
+4. **Weighted sum**: Output mainly comes from "love"'s representation, Decoder will likely generate "爱"!
+
+**Key point**: Attention weights automatically learn vocabulary alignment relationships.
+
+#### 6. Gradient Flow: The Key to Co-training
+
+```
+Loss → Decoder output → Cross-Attention
+                           ↓ ✓ ↘
+                         Q   K   V
+                         ↓   ↓   ↓
+                    Decoder  Encoder
+```
+
+**Three gradient paths:**
+
+1. **K, V → Encoder**: Let Encoder learn to encode "useful for generation" information
+
+2. **Q → Decoder**: Let Decoder learn to ask the "correct" questions
+
+3. **Projection matrices**: Learn how to align the two sequences
+
+**This ensures end-to-end collaborative optimization of Encoder and Decoder.**
+
+#### 7. Interview Quick Response Template
+
+**Core version (30 seconds):**
+
+"Decoder queries Encoder information through Cross-Attention. Q comes from Decoder, K and V come from Encoder, computing attention through $\text{softmax}(QK^T/\sqrt{d_k})V$ to achieve alignment between sequences."
+
+**Complete version (1 minute):**
+
+"Based on the core mechanism, supplement: ①Q, K, V are generated through independent projection matrices, implementing semantic space alignment; ②Multi-head mechanism learns different alignment patterns in parallel; ③Scaling factor $\sqrt{d_k}$ stabilizes training; ④Gradients flow back to Encoder through K and V, achieving end-to-end optimization."
+
+### Summary
+
+**Cross-Attention = Intelligent Retrieval System:**
+
+• **Query (Question)**: From Decoder
+
+• **Key-Value (Knowledge Base)**: From Encoder
+
+• **Attention weights**: Tell us which knowledge is most relevant
+
+• **Output**: Aggregate relevant knowledge for generation
+
+**Core technical points:**
+
+1. ✅ Linear projection implements semantic alignment
+
+2. ✅ Multi-head learns multiple patterns in parallel
+
+3. ✅ Scaling factor accumulation stabilizes training
+
+4. ✅ Gradient flow ensures collaborative optimization
