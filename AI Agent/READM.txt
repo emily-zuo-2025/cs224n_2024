@@ -1,0 +1,4 @@
+https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
+
+https://www.promptingguide.ai/guides/context-engineering-guide.en#system-prompt
+
