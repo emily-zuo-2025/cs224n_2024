@@ -14,4 +14,6 @@ Stanford CS234
 https://www.youtube.com/watch?v=WsvFL-LjA6U&list=PLoROMvodv4rN4wG6Nk6sNpTEbuOSosZdX&index=1
 github: https://github.com/Rhyme0730/CS234-Reinforcement-Learning/blob/main/A1_RiverSwim_MDP/vi_and_pi.py
 
+Huggingface courses -- RLHF
+https://huggingface.co/blog/rlhf
 
