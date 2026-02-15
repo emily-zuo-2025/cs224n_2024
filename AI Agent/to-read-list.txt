@@ -1,0 +1,14 @@
+https://humanlm.stanford.edu/
+
+https://www.databricks.com/blog/power-rlvr-training-leading-sql-reasoning-model-databricks
+
+# RL from variable rewards
+https://labelstud.io/blog/reinforcement-learning-from-verifiable-rewards/
+
+# constitutional AI 
+https://arxiv.org/pdf/2212.08073
+
+# GDPval
+https://openai.com/index/gdpval/?utm_source=chatgpt.com
+
+
