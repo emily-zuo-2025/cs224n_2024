@@ -1,2 +1,7 @@
 # React broadcast link 
 https://www.latent.space/p/shunyu
+
+# Math
+https://jerryqin.com/posts/a-working-list-of-probability-problems
+
+
