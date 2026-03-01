@@ -1,0 +1,13 @@
+# Requirements for Lesson 3 - Building a QA Agent with Claude on Vertex AI
+
+# Anthropic SDK with Vertex AI support
+anthropic[vertex]>=0.40.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Jupyter notebook display utilities
+ipython>=8.0.0
+
+# Google Cloud authentication (if not already installed)
+google-auth>=2.0.0
